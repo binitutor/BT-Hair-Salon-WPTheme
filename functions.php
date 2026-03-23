@@ -619,7 +619,7 @@ function bt_hair_rest_submit_appointment( WP_REST_Request $request ) {
 /**
  * Validate webhook URLs with local development allowance.
  *
- * Uses WordPress strict validation first. For local development, this allows
+ * Uses WordPress strict validation first. If that fails, this allows
  * localhost and common private/loopback ranges that WordPress blocks by default.
  *
  * @param string $url Webhook URL.
@@ -634,10 +634,6 @@ function bt_hair_is_valid_webhook_url( $url ) {
 
     if ( wp_http_validate_url( $url ) ) {
         return true;
-    }
-
-    if ( 'production' === wp_get_environment_type() ) {
-        return false;
     }
 
     $parsed = wp_parse_url( $url );
