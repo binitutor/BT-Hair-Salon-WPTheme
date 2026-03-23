@@ -82,6 +82,10 @@ function bt_hair_install_tables() {
         add_option( 'bt_hair_n8n_webhook_url', '' );
     }
 
+    if ( false === get_option( 'bt_hair_n8n_chat_webhook_url', false ) ) {
+        add_option( 'bt_hair_n8n_chat_webhook_url', '' );
+    }
+
     bt_hair_ensure_required_pages();
 
     flush_rewrite_rules();
@@ -491,6 +495,16 @@ function bt_hair_register_rest_routes() {
             ),
         )
     );
+
+    register_rest_route(
+        'bt-hair/v1',
+        '/chat',
+        array(
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => 'bt_hair_rest_chat',
+            'permission_callback' => '__return_true',
+        )
+    );
 }
 add_action( 'rest_api_init', 'bt_hair_register_rest_routes' );
 
@@ -687,6 +701,59 @@ function bt_hair_send_n8n_webhook( $payload ) {
             'timeout' => 10,
         )
     );
+}
+
+/**
+ * Handle AI chat message: proxy to configured n8n chat webhook.
+ *
+ * @param WP_REST_Request $request Request.
+ * @return WP_REST_Response|WP_Error
+ */
+function bt_hair_rest_chat( WP_REST_Request $request ) {
+    $message    = sanitize_text_field( (string) $request->get_param( 'message' ) );
+    $session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+
+    if ( '' === $message ) {
+        return new WP_Error( 'empty_message', 'Message cannot be empty.', array( 'status' => 400 ) );
+    }
+
+    $url = trim( (string) get_option( 'bt_hair_n8n_chat_webhook_url', '' ) );
+
+    if ( '' === $url || ! bt_hair_is_valid_webhook_url( $url ) ) {
+        return new WP_Error( 'chat_unavailable', 'AI chat is not configured. Please contact the salon directly.', array( 'status' => 503 ) );
+    }
+
+    $response = wp_remote_post(
+        $url,
+        array(
+            'headers' => array( 'Content-Type' => 'application/json' ),
+            'body'    => wp_json_encode(
+                array(
+                    'message'    => $message,
+                    'session_id' => $session_id,
+                )
+            ),
+            'timeout' => 30,
+        )
+    );
+
+    if ( is_wp_error( $response ) ) {
+        return new WP_Error( 'chat_error', 'Unable to reach AI agent. Please try again later.', array( 'status' => 502 ) );
+    }
+
+    $body = wp_remote_retrieve_body( $response );
+    $data = json_decode( $body, true );
+
+    $reply = '';
+    if ( is_array( $data ) ) {
+        $reply = (string) ( $data['reply'] ?? $data['output'] ?? $data['message'] ?? $data['response'] ?? $data['text'] ?? '' );
+    }
+
+    if ( '' === $reply ) {
+        $reply = is_string( $body ) ? trim( $body ) : 'No response from AI.';
+    }
+
+    return rest_ensure_response( array( 'reply' => $reply ) );
 }
 
 /**
@@ -1067,7 +1134,8 @@ function bt_hair_rest_appointment_status( WP_REST_Request $request ) {
 function bt_hair_rest_settings_get() {
     return rest_ensure_response(
         array(
-            'webhook_url' => (string) get_option( 'bt_hair_n8n_webhook_url', '' ),
+            'webhook_url'      => (string) get_option( 'bt_hair_n8n_webhook_url', '' ),
+            'chat_webhook_url' => (string) get_option( 'bt_hair_n8n_chat_webhook_url', '' ),
         )
     );
 }
@@ -1079,13 +1147,19 @@ function bt_hair_rest_settings_get() {
  * @return WP_REST_Response|WP_Error
  */
 function bt_hair_rest_settings_save( WP_REST_Request $request ) {
-    $url = trim( (string) $request->get_param( 'webhook_url' ) );
+    $url      = trim( (string) $request->get_param( 'webhook_url' ) );
+    $chat_url = trim( (string) $request->get_param( 'chat_webhook_url' ) );
 
     if ( ! bt_hair_is_valid_webhook_url( $url ) ) {
         return new WP_Error( 'invalid_url', 'Webhook URL is invalid.', array( 'status' => 400 ) );
     }
 
+    if ( ! bt_hair_is_valid_webhook_url( $chat_url ) ) {
+        return new WP_Error( 'invalid_chat_url', 'Chat Webhook URL is invalid.', array( 'status' => 400 ) );
+    }
+
     update_option( 'bt_hair_n8n_webhook_url', $url );
+    update_option( 'bt_hair_n8n_chat_webhook_url', $chat_url );
 
     return rest_ensure_response( array( 'success' => true ) );
 }

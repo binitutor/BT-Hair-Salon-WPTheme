@@ -21,6 +21,29 @@ if ( ! ( function_exists( 'bt_hair_is_dashboard_page' ) && bt_hair_is_dashboard_
     </div>
 </footer>
 
+<?php if ( ! ( function_exists( 'bt_hair_is_dashboard_page' ) && bt_hair_is_dashboard_page() ) && ! ( function_exists( 'bt_hair_is_sign_in_page' ) && bt_hair_is_sign_in_page() ) ) : ?>
+<div id="bt-chatbot-wrap">
+    <div id="bt-chat-tooltip">Got questions? Ask AI agent!</div>
+    <button id="bt-chatbot-btn" type="button" aria-label="Chat with AI assistant">
+        <i class="fa-solid fa-robot"></i>
+    </button>
+</div>
+
+<div id="bt-chat-window" aria-label="AI Chat Assistant">
+    <div id="bt-chat-header">
+        <span><i class="fa-solid fa-robot me-2"></i>AI Assistant</span>
+        <button id="bt-chat-close" type="button" aria-label="Close chat">&times;</button>
+    </div>
+    <div id="bt-chat-messages" aria-live="polite"></div>
+    <div id="bt-chat-input-wrap">
+        <input type="text" id="bt-chat-input" placeholder="Type your question…" autocomplete="off" maxlength="500" aria-label="Chat message" />
+        <button type="button" id="bt-chat-send" aria-label="Send message">
+            <i class="fa-solid fa-paper-plane"></i>
+        </button>
+    </div>
+</div>
+<?php endif; ?>
+
 <?php wp_footer(); ?>
 </body>
 </html>

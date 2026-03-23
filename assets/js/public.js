@@ -155,5 +155,121 @@
         } else {
             window.addEventListener("load", markSiteLoaded, { once: true });
         }
+
+        initChatbot();
     });
+
+    function generateSessionId() {
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+            var r = (Math.random() * 16) | 0;
+            return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+        });
+    }
+
+    function initChatbot() {
+        var wrap     = document.getElementById("bt-chatbot-wrap");
+        var btn      = document.getElementById("bt-chatbot-btn");
+        var win      = document.getElementById("bt-chat-window");
+        var closeBtn = document.getElementById("bt-chat-close");
+        var input    = document.getElementById("bt-chat-input");
+        var sendBtn  = document.getElementById("bt-chat-send");
+        var msgs     = document.getElementById("bt-chat-messages");
+
+        if (!wrap || !btn || !win) { return; }
+
+        var sessionId = sessionStorage.getItem("bt_chat_sid");
+        if (!sessionId) {
+            sessionId = generateSessionId();
+            sessionStorage.setItem("bt_chat_sid", sessionId);
+        }
+
+        var isOpen = false;
+
+        function openChat() {
+            isOpen = true;
+            win.classList.add("bt-chat-visible");
+            wrap.classList.add("chat-open");
+            input.focus();
+            if (!msgs.children.length) {
+                appendMsg("ai", "Hi! I\u2019m the BT Hair Salon AI assistant. Ask me anything about our services, pricing, or booking!");
+            }
+        }
+
+        function closeChat() {
+            isOpen = false;
+            win.classList.remove("bt-chat-visible");
+            wrap.classList.remove("chat-open");
+        }
+
+        btn.addEventListener("click", function () {
+            isOpen ? closeChat() : openChat();
+        });
+
+        closeBtn.addEventListener("click", closeChat);
+
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" && isOpen) { closeChat(); }
+        });
+
+        function appendMsg(role, text) {
+            var el = document.createElement("div");
+            el.className = "bt-chat-msg " + role;
+            el.textContent = text;
+            msgs.appendChild(el);
+            msgs.scrollTop = msgs.scrollHeight;
+            return el;
+        }
+
+        function showTyping() {
+            var el = document.createElement("div");
+            el.className = "bt-chat-msg ai typing";
+            el.innerHTML = "<span></span><span></span><span></span>";
+            msgs.appendChild(el);
+            msgs.scrollTop = msgs.scrollHeight;
+            return el;
+        }
+
+        async function sendMessage() {
+            var text = input.value.trim();
+            if (!text) { return; }
+
+            input.value = "";
+            sendBtn.disabled = true;
+            input.disabled = true;
+
+            appendMsg("user", text);
+            var typingEl = showTyping();
+
+            try {
+                var resp = await fetch(btHairPublic.restUrl + "chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: text, session_id: sessionId })
+                });
+                var data = await resp.json();
+                typingEl.remove();
+                if (!resp.ok) {
+                    appendMsg("ai", data.message || "Sorry, something went wrong. Please try again.");
+                } else {
+                    appendMsg("ai", data.reply || "No response from AI.");
+                }
+            } catch (err) {
+                typingEl.remove();
+                appendMsg("ai", "Unable to connect to AI service. Please try again later.");
+            } finally {
+                sendBtn.disabled = false;
+                input.disabled = false;
+                input.focus();
+            }
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+
+        input.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
 })(jQuery);
