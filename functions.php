@@ -617,6 +617,59 @@ function bt_hair_rest_submit_appointment( WP_REST_Request $request ) {
 }
 
 /**
+ * Validate webhook URLs with local development allowance.
+ *
+ * Uses WordPress strict validation first. For local development, this allows
+ * localhost and common private/loopback ranges that WordPress blocks by default.
+ *
+ * @param string $url Webhook URL.
+ * @return bool
+ */
+function bt_hair_is_valid_webhook_url( $url ) {
+    $url = trim( (string) $url );
+
+    if ( '' === $url ) {
+        return true;
+    }
+
+    if ( wp_http_validate_url( $url ) ) {
+        return true;
+    }
+
+    if ( 'production' === wp_get_environment_type() ) {
+        return false;
+    }
+
+    $parsed = wp_parse_url( $url );
+    if ( ! is_array( $parsed ) || empty( $parsed['scheme'] ) || empty( $parsed['host'] ) ) {
+        return false;
+    }
+
+    $scheme = strtolower( (string) $parsed['scheme'] );
+    if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+        return false;
+    }
+
+    $host = strtolower( trim( (string) $parsed['host'] ) );
+    if ( 'localhost' === $host || '127.0.0.1' === $host || '::1' === $host ) {
+        return true;
+    }
+
+    if ( filter_var( $host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 ) ) {
+        $octets = array_map( 'intval', explode( '.', $host ) );
+        if ( 10 === $octets[0]
+            || 127 === $octets[0]
+            || ( 172 === $octets[0] && 16 <= $octets[1] && 31 >= $octets[1] )
+            || ( 192 === $octets[0] && 168 === $octets[1] )
+        ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
  * Trigger n8n webhook.
  *
  * @param array<string, mixed> $payload Appointment payload.
@@ -624,7 +677,7 @@ function bt_hair_rest_submit_appointment( WP_REST_Request $request ) {
 function bt_hair_send_n8n_webhook( $payload ) {
     $url = trim( (string) get_option( 'bt_hair_n8n_webhook_url', '' ) );
 
-    if ( '' === $url || ! wp_http_validate_url( $url ) ) {
+    if ( '' === $url || ! bt_hair_is_valid_webhook_url( $url ) ) {
         return;
     }
 
@@ -1032,7 +1085,7 @@ function bt_hair_rest_settings_get() {
 function bt_hair_rest_settings_save( WP_REST_Request $request ) {
     $url = trim( (string) $request->get_param( 'webhook_url' ) );
 
-    if ( '' !== $url && ! wp_http_validate_url( $url ) ) {
+    if ( ! bt_hair_is_valid_webhook_url( $url ) ) {
         return new WP_Error( 'invalid_url', 'Webhook URL is invalid.', array( 'status' => 400 ) );
     }
 
