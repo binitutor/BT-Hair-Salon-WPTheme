@@ -1,0 +1,264 @@
+:root {
+    --bg-primary: #4f2702;
+    --bg-secondary: #fcfcfc;
+    --text-primary: #120901;
+    --text-secondary: #023617;
+    --surface: #fff7f1;
+    --accent-soft: #f2dfcf;
+}
+
+body {
+    font-family: "Manrope", sans-serif;
+    color: var(--text-primary);
+    background: radial-gradient(circle at 15% 15%, #fff4eb 0%, var(--bg-secondary) 42%, #f4ede7 100%);
+}
+
+body.bt-hair-public:not(.site-loaded) {
+    overflow: hidden;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.brand {
+    font-family: "Playfair Display", serif;
+}
+
+.bt-nav,
+.dashboard-topbar {
+    background: linear-gradient(90deg, #341603 0%, var(--bg-primary) 45%, #6a3711 100%);
+}
+
+.bt-nav {
+    position: sticky;
+    top: 0;
+    z-index: 1050;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.dashboard-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 1045;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22);
+}
+
+body.admin-bar .dashboard-topbar {
+    top: 32px;
+}
+
+.dashboard-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: #fcfcfc;
+}
+
+.dashboard-brand i {
+    color: #ffe6d0;
+}
+
+.dashboard-brand-title {
+    margin: 0;
+    color: #fcfcfc;
+    font-size: 1.2rem;
+    line-height: 1.2;
+}
+
+.dashboard-topbar .btn-outline-light {
+    border-color: rgba(255, 255, 255, 0.68);
+}
+
+.dashboard-topbar .btn-outline-light:hover {
+    color: #2e1604;
+    background: #ffffff;
+}
+
+.bt-nav .brand,
+.bt-nav .brand i,
+.bt-nav .brand span {
+    color: #fcfcfc;
+}
+
+.hero-section {
+    min-height: 70vh;
+    background: url("../images/cover.jpg") center/cover no-repeat;
+}
+
+.hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, rgba(18, 9, 1, 0.8) 0%, rgba(79, 39, 2, 0.6) 45%, rgba(2, 54, 23, 0.4) 100%);
+}
+
+.btn-accent {
+    background: var(--text-secondary);
+    color: #fff;
+    border: 1px solid transparent;
+}
+
+.btn-accent:hover,
+.btn-accent:focus {
+    background: #054b21;
+    color: #fff;
+}
+
+.section-title {
+    color: var(--text-primary);
+}
+
+.services-section {
+    background: var(--bg-secondary);
+}
+
+.service-card {
+    border: 1px solid #e7d8cd;
+    border-radius: 1rem;
+    background: #fff;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.service-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 0.8rem 1.8rem rgba(79, 39, 2, 0.15);
+}
+
+.booking-section {
+    background: linear-gradient(180deg, #fdf8f5 0%, #ffffff 100%);
+}
+
+.booking-info {
+    border-radius: 1rem;
+    color: #fff;
+    background: linear-gradient(140deg, var(--bg-primary) 0%, #2b1a0a 100%);
+}
+
+.booking-info i {
+    color: #ffe8cf;
+    margin-right: 0.5rem;
+}
+
+.card,
+.booking-info,
+.service-card {
+    animation: cardIn 1.1s ease both;
+}
+
+#bt-page-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(140deg, #2f1705 0%, #4f2702 50%, #6a3813 100%);
+    color: #fdf7ef;
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 1.3s ease, visibility 1.3s ease;
+}
+
+#bt-page-loader .loader-inner {
+    letter-spacing: 0.03em;
+}
+
+#bt-page-loader .loader-icon {
+    font-size: 2.6rem;
+    animation: loaderPulse 1.8s ease-in-out infinite;
+}
+
+body.site-loaded #bt-page-loader {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+@keyframes loaderPulse {
+    0% {
+        transform: rotate(-8deg) scale(0.92);
+        opacity: 0.7;
+    }
+    50% {
+        transform: rotate(8deg) scale(1.05);
+        opacity: 1;
+    }
+    100% {
+        transform: rotate(-8deg) scale(0.92);
+        opacity: 0.7;
+    }
+}
+
+.reveal-on-scroll {
+    opacity: 0;
+    transform: translateY(36px);
+    transition: opacity 1s ease, transform 1s ease;
+}
+
+.reveal-on-scroll.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@keyframes cardIn {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#appointments-table-body .status-pill {
+    border-radius: 999px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.status-pending {
+    background: #fef3d7;
+    color: #8a6000;
+}
+
+.status-accepted {
+    background: #dbf8e8;
+    color: #0b7c32;
+}
+
+.status-rejected {
+    background: #ffe1e1;
+    color: #9a1f1f;
+}
+
+footer {
+    background: #2a1404;
+    color: #eee3d8;
+}
+
+@media (max-width: 991.98px) {
+    .hero-section {
+        min-height: 55vh;
+    }
+
+    .dashboard-brand-title {
+        font-size: 1.05rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .hero-section h1 {
+        font-size: 2rem;
+    }
+
+    body.admin-bar .dashboard-topbar {
+        top: 46px;
+    }
+}
