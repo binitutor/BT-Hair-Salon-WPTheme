@@ -86,6 +86,14 @@ function bt_hair_install_tables() {
         add_option( 'bt_hair_n8n_chat_webhook_url', '' );
     }
 
+    if ( false === get_option( 'bt_hair_chatbot_api_key', false ) ) {
+        add_option( 'bt_hair_chatbot_api_key', '' );
+    }
+
+    if ( false === get_option( 'bt_hair_chatbot_enabled', false ) ) {
+        add_option( 'bt_hair_chatbot_enabled', '0' );
+    }
+
     bt_hair_ensure_required_pages();
 
     flush_rewrite_rules();
@@ -169,7 +177,7 @@ add_action( 'init', 'bt_hair_register_page_rewrites', 9 );
  * Run one-time setup after theme updates: ensure pages and flush rewrites.
  */
 function bt_hair_maybe_setup_pages_and_rewrites() {
-    $setup_version = '1.0.1';
+    $setup_version = '1.0.2';
     $current       = get_option( 'bt_hair_setup_version', '' );
 
     if ( $current === $setup_version ) {
@@ -177,6 +185,15 @@ function bt_hair_maybe_setup_pages_and_rewrites() {
     }
 
     bt_hair_ensure_required_pages();
+
+    if ( false === get_option( 'bt_hair_chatbot_api_key', false ) ) {
+        add_option( 'bt_hair_chatbot_api_key', '' );
+    }
+
+    if ( false === get_option( 'bt_hair_chatbot_enabled', false ) ) {
+        add_option( 'bt_hair_chatbot_enabled', '0' );
+    }
+
     flush_rewrite_rules( false );
     update_option( 'bt_hair_setup_version', $setup_version );
 }
@@ -309,17 +326,25 @@ add_action( 'template_redirect', 'bt_hair_protect_dashboard_page' );
  * Enqueue scripts and styles.
  */
 function bt_hair_enqueue_assets() {
+    $main_css_path   = get_template_directory() . '/assets/css/main.css';
+    $public_js_path  = get_template_directory() . '/assets/js/public.js';
+    $dashboard_js_path = get_template_directory() . '/assets/js/dashboard.js';
+
+    $main_css_ver    = file_exists( $main_css_path ) ? (string) filemtime( $main_css_path ) : '1.0.0';
+    $public_js_ver   = file_exists( $public_js_path ) ? (string) filemtime( $public_js_path ) : '1.0.0';
+    $dashboard_js_ver = file_exists( $dashboard_js_path ) ? (string) filemtime( $dashboard_js_path ) : '1.0.0';
+
     wp_enqueue_style( 'bt-google-fonts', 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;800&family=Manrope:wght@400;500;700&display=swap', array(), null );
     wp_enqueue_style( 'bt-bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css', array(), '5.3.3' );
     wp_enqueue_style( 'bt-fontawesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css', array(), '6.5.2' );
-    wp_enqueue_style( 'bt-hair-main', get_template_directory_uri() . '/assets/css/main.css', array( 'bt-bootstrap' ), '1.0.0' );
+    wp_enqueue_style( 'bt-hair-main', get_template_directory_uri() . '/assets/css/main.css', array( 'bt-bootstrap' ), $main_css_ver );
 
     wp_enqueue_script( 'bt-bootstrap', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js', array(), '5.3.3', true );
     wp_enqueue_script( 'bt-sweetalert', 'https://cdn.jsdelivr.net/npm/sweetalert2@11', array(), '11', true );
 
     if ( bt_hair_is_dashboard_page() ) {
         wp_enqueue_script( 'bt-chartjs', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js', array(), '4.4.3', true );
-        wp_enqueue_script( 'bt-hair-dashboard', get_template_directory_uri() . '/assets/js/dashboard.js', array( 'jquery', 'bt-chartjs', 'bt-sweetalert' ), '1.0.0', true );
+        wp_enqueue_script( 'bt-hair-dashboard', get_template_directory_uri() . '/assets/js/dashboard.js', array( 'jquery', 'bt-chartjs', 'bt-sweetalert' ), $dashboard_js_ver, true );
         wp_localize_script(
             'bt-hair-dashboard',
             'btHairAdmin',
@@ -333,7 +358,7 @@ function bt_hair_enqueue_assets() {
     }
 
     if ( ! bt_hair_is_sign_in_page() ) {
-        wp_enqueue_script( 'bt-hair-public', get_template_directory_uri() . '/assets/js/public.js', array( 'jquery', 'bt-sweetalert' ), '1.0.0', true );
+        wp_enqueue_script( 'bt-hair-public', get_template_directory_uri() . '/assets/js/public.js', array( 'jquery', 'bt-sweetalert' ), $public_js_ver, true );
         wp_localize_script(
             'bt-hair-public',
             'btHairPublic',
@@ -713,6 +738,10 @@ function bt_hair_rest_chat( WP_REST_Request $request ) {
     $message    = sanitize_text_field( (string) $request->get_param( 'message' ) );
     $session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
 
+    if ( '1' !== (string) get_option( 'bt_hair_chatbot_enabled', '0' ) ) {
+        return new WP_Error( 'chat_disabled', 'AI chat is currently disabled.', array( 'status' => 403 ) );
+    }
+
     if ( '' === $message ) {
         return new WP_Error( 'empty_message', 'Message cannot be empty.', array( 'status' => 400 ) );
     }
@@ -731,6 +760,7 @@ function bt_hair_rest_chat( WP_REST_Request $request ) {
                 array(
                     'message'    => $message,
                     'session_id' => $session_id,
+                    'api_key'    => (string) get_option( 'bt_hair_chatbot_api_key', '' ),
                 )
             ),
             'timeout' => 30,
@@ -1136,6 +1166,8 @@ function bt_hair_rest_settings_get() {
         array(
             'webhook_url'      => (string) get_option( 'bt_hair_n8n_webhook_url', '' ),
             'chat_webhook_url' => (string) get_option( 'bt_hair_n8n_chat_webhook_url', '' ),
+            'chatbot_api_key'  => (string) get_option( 'bt_hair_chatbot_api_key', '' ),
+            'chatbot_enabled'  => '1' === (string) get_option( 'bt_hair_chatbot_enabled', '0' ),
         )
     );
 }
@@ -1147,8 +1179,14 @@ function bt_hair_rest_settings_get() {
  * @return WP_REST_Response|WP_Error
  */
 function bt_hair_rest_settings_save( WP_REST_Request $request ) {
-    $url      = trim( (string) $request->get_param( 'webhook_url' ) );
-    $chat_url = trim( (string) $request->get_param( 'chat_webhook_url' ) );
+    $url         = $request->has_param( 'webhook_url' ) ? trim( (string) $request->get_param( 'webhook_url' ) ) : (string) get_option( 'bt_hair_n8n_webhook_url', '' );
+    $chat_url    = $request->has_param( 'chat_webhook_url' ) ? trim( (string) $request->get_param( 'chat_webhook_url' ) ) : (string) get_option( 'bt_hair_n8n_chat_webhook_url', '' );
+    $chatbot_key = $request->has_param( 'chatbot_api_key' ) ? trim( sanitize_text_field( (string) $request->get_param( 'chatbot_api_key' ) ) ) : (string) get_option( 'bt_hair_chatbot_api_key', '' );
+
+    $chatbot_enabled = '1' === (string) get_option( 'bt_hair_chatbot_enabled', '0' ) ? '1' : '0';
+    if ( $request->has_param( 'chatbot_enabled' ) ) {
+        $chatbot_enabled = rest_sanitize_boolean( $request->get_param( 'chatbot_enabled' ) ) ? '1' : '0';
+    }
 
     if ( ! bt_hair_is_valid_webhook_url( $url ) ) {
         return new WP_Error( 'invalid_url', 'Webhook URL is invalid.', array( 'status' => 400 ) );
@@ -1160,6 +1198,8 @@ function bt_hair_rest_settings_save( WP_REST_Request $request ) {
 
     update_option( 'bt_hair_n8n_webhook_url', $url );
     update_option( 'bt_hair_n8n_chat_webhook_url', $chat_url );
+    update_option( 'bt_hair_chatbot_api_key', $chatbot_key );
+    update_option( 'bt_hair_chatbot_enabled', $chatbot_enabled );
 
     return rest_ensure_response( array( 'success' => true ) );
 }

@@ -21,7 +21,7 @@ if ( ! ( function_exists( 'bt_hair_is_dashboard_page' ) && bt_hair_is_dashboard_
     </div>
 </footer>
 
-<?php if ( ! ( function_exists( 'bt_hair_is_dashboard_page' ) && bt_hair_is_dashboard_page() ) && ! ( function_exists( 'bt_hair_is_sign_in_page' ) && bt_hair_is_sign_in_page() ) ) : ?>
+<?php if ( ! ( function_exists( 'bt_hair_is_dashboard_page' ) && bt_hair_is_dashboard_page() ) && ! ( function_exists( 'bt_hair_is_sign_in_page' ) && bt_hair_is_sign_in_page() ) && '1' === (string) get_option( 'bt_hair_chatbot_enabled', '0' ) ) : ?>
 <div id="bt-chatbot-wrap">
     <div id="bt-chat-tooltip">Got questions? Ask AI agent!</div>
     <button id="bt-chatbot-btn" type="button" aria-label="Chat with AI assistant">

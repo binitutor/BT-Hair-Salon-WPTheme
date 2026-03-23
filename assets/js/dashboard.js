@@ -145,6 +145,13 @@
         });
     }
 
+    function renderChatbotFeature(settings) {
+        const enabled = settings.chatbot_enabled === true || settings.chatbot_enabled === 1 || settings.chatbot_enabled === "1";
+        $("#chatbot-api-key").val(settings.chatbot_api_key || "");
+        $("#chatbot-toggle").prop("checked", enabled);
+        $("#chatbot-status").text(enabled ? "Active" : "Inactive");
+    }
+
     async function loadDashboard() {
         const [services, slots, appointments, settings] = await Promise.all([
             api("services"),
@@ -157,6 +164,7 @@
         state.slots = slots;
         state.appointments = appointments;
         $("#webhook_url").val(settings.webhook_url || "");
+        renderChatbotFeature(settings);
 
         renderServices();
         renderSlots();
@@ -299,6 +307,36 @@
         }
     }
 
+    async function saveChatbotApiKey(event) {
+        event.preventDefault();
+
+        const payload = {
+            chatbot_api_key: $("#chatbot-api-key").val().trim()
+        };
+
+        try {
+            await api("settings", "POST", payload);
+            Swal.fire("Saved", "Chatbot API key updated.", "success");
+        } catch (error) {
+            Swal.fire("Error", error.message, "error");
+        }
+    }
+
+    async function toggleChatbot() {
+        const enabled = $("#chatbot-toggle").is(":checked");
+
+        try {
+            await api("settings", "POST", { chatbot_enabled: enabled });
+            $("#chatbot-status").text(enabled ? "Active" : "Inactive");
+            Swal.fire("Saved", enabled ? "Chatbot enabled for public users." : "Chatbot disabled for public users.", "success");
+        } catch (error) {
+            // Revert UI if save fails.
+            $("#chatbot-toggle").prop("checked", !enabled);
+            $("#chatbot-status").text(!enabled ? "Active" : "Inactive");
+            Swal.fire("Error", error.message, "error");
+        }
+    }
+
     $(document).ready(async function () {
         if (!$("#appointments-table-body").length) {
             return;
@@ -307,6 +345,8 @@
         $("#service-form").on("submit", createService);
         $("#slot-form").on("submit", createSlot);
         $("#settings-form").on("submit", saveSettings);
+        $("#chatbot-settings-form").on("submit", saveChatbotApiKey);
+        $("#chatbot-toggle").on("change", toggleChatbot);
         $("#refresh-dashboard").on("click", loadDashboard);
 
         $(document).on("click", ".edit-service", function () {

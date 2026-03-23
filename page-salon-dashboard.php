@@ -157,10 +157,19 @@ get_header();
                             <tbody id="features-table-body">
                                 <tr>
                                     <td>Chatbot</td>
-                                    <td>Automated chat support for clients.</td>
-                                    <td>Inactive</td>
+                                    <td>
+                                        Automated chat support for clients.
+                                        <form id="chatbot-settings-form" class="row g-2 mt-2">
+                                            <div class="col-sm-8 col-lg-7">
+                                                <input type="text" class="form-control form-control-sm" id="chatbot-api-key" placeholder="Enter OpenAI API Key" autocomplete="off">
+                                            </div>
+                                            <div class="col-sm-4 col-lg-3 d-grid">
+                                                <button type="submit" class="btn btn-sm btn-outline-dark">Save API Key</button>
+                                            </div>
+                                        </form>
+                                    </td>
+                                    <td id="chatbot-status">Inactive</td>
                                     <td class="text-end">
-                                        <!-- <button class="btn btn-sm btn-outline-dark">Configure</button> -->
                                         <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" role="switch" id="chatbot-toggle">
                                         </div>
@@ -168,13 +177,28 @@ get_header();
                                 </tr>
                                 <tr>
                                     <td>Email</td>
-                                    <td>Automated email support for clients.</td>
+                                    <td>
+                                        <!-- Automated email support for clients.
+                                        <input type="text" placeholder="Enter Gmail API Key" class="form-control" id="email-api-key" >
+                                        <button class="btn btn-sm btn-outline-dark">Save</button> -->
+                                        Automated email support for clients.
+                                        <form class="row g-3">
+                                            <div class="col-auto">
+                                                <!-- <label for="email-api-key" class="visually-hidden">Automated email support for clients.</label> -->
+                                                <input type="text" class="form-control-plaintext" id="email-api-key" placeholder="Enter Gmail API Key">
+                                            </div>
+                                            <div class="col-auto">
+                                                <button type="submit" class="btn btn-sm btn-outline-dark mb-3">Save</button>
+                                            </div>
+                                        </form>
+                                    </td>
                                     <td>Inactive</td>
                                     <td class="text-end">
                                         <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" role="switch" id="email-toggle">
                                         </div>
                                     </td>
+                                    
                                 </tr>
                             </tbody>
                         </table>
