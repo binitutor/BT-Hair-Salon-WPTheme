@@ -136,6 +136,53 @@ get_header();
                 </div>
             </div>
         </div>
+
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2 class="h5 mb-0"><i class="fa-regular fa-gear"></i> Features</h2>
+                        <!-- <button id="refresh-dashboard" class="btn btn-outline-dark btn-sm">Refresh</button> -->
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table align-middle table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Feature</th>
+                                    <th>Description</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="features-table-body">
+                                <tr>
+                                    <td>Chatbot</td>
+                                    <td>Automated chat support for clients.</td>
+                                    <td>Inactive</td>
+                                    <td class="text-end">
+                                        <!-- <button class="btn btn-sm btn-outline-dark">Configure</button> -->
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="chatbot-toggle">
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Email</td>
+                                    <td>Automated email support for clients.</td>
+                                    <td>Inactive</td>
+                                    <td class="text-end">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="email-toggle">
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </main>
 <?php
