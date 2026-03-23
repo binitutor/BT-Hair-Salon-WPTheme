@@ -27,6 +27,8 @@ A custom WordPress theme for a hair salon business. Includes a public appointmen
 - **404 Page** — Styled page-not-found template consistent with the rest of the theme.
 - **REST API** — All data operations are handled through a versioned REST namespace (`bt-hair/v1`).
 - **n8n Webhook Integration** — Optionally trigger an n8n automation workflow when a new appointment is submitted.
+- **AI Chatbot Integration** — Floating chatbot widget for public visitors (toggleable), with chat requests proxied to an n8n chat webhook.
+- **Email Integration Support** — Appointment payloads can be routed to n8n for transactional email workflows (confirmation, follow-up, reminders). Email feature controls are available in the dashboard Features section for future provider-level API key handling.
 - **Appointment Status Chart** — Visual breakdown of pending, accepted, and rejected appointments using Chart.js.
 - **Page Auto-Creation** — Required pages (`salon-dashboard`, `sign-in`) are created automatically on theme activation with the correct templates assigned.
 - **Non-Pretty-Permalink Compatible** — REST calls use query-style URLs (`index.php?rest_route=...`) for compatibility with environments that don't have Apache rewrites enabled.
@@ -128,8 +130,9 @@ All endpoints requiring authentication use `manage_options` capability (WordPres
 | GET | `/slots` | Admin | List all availability slots |
 | POST | `/slots` | Admin | Create a new slot |
 | DELETE | `/slots/{id}` | Admin | Delete a slot |
-| GET | `/settings` | Admin | Get saved settings (n8n webhook URL) |
-| POST | `/settings` | Admin | Save settings |
+| POST | `/chat` | Public | Send a chatbot message to the configured n8n chat workflow |
+| GET | `/settings` | Admin | Get saved integration settings |
+| POST | `/settings` | Admin | Save integration settings |
 
 ---
 
@@ -141,9 +144,20 @@ All endpoints requiring authentication use `manage_options` capability (WordPres
 
 ---
 
-## n8n Webhook Integration
+## Integration Settings (Dashboard)
 
-An n8n webhook URL can be configured from the dashboard Settings section. When a new appointment is submitted and accepted, the theme POSTs the appointment data to the configured webhook URL, allowing automation workflows (e.g. email/SMS notifications, CRM updates) to be triggered externally.
+From `/salon-dashboard/`, the theme supports these integration settings:
+
+- **Webhook URL** (`bt_hair_n8n_webhook_url`) — receives appointment submission payloads.
+- **Chat Webhook URL** (`bt_hair_n8n_chat_webhook_url`) — receives chatbot user messages and returns AI replies.
+- **Chatbot API Key** (`bt_hair_chatbot_api_key`) — stored for forwarding to the chat workflow payload.
+- **Chatbot Toggle** (`bt_hair_chatbot_enabled`) — controls whether the floating chatbot icon/window appears on public pages.
+
+## n8n Integrations
+
+- **Appointment Automation:** When a visitor submits an appointment request, the theme POSTs appointment data to the configured appointment webhook URL. This can trigger email/SMS notifications, CRM sync, and internal workflows.
+- **Chatbot Automation:** Public chat messages are sent to the configured chat webhook. The workflow response is returned to the visitor in the chat window.
+- **Email Workflows:** Email sending is expected to be handled by n8n workflows (SMTP, Gmail, SendGrid, etc.) using the appointment/chat payloads.
 
 ---
 
