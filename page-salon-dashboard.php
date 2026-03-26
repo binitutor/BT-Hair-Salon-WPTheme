@@ -99,11 +99,17 @@ get_header();
                         <div class="col-12">
                             <input type="url" id="webhook_url" class="form-control" placeholder="https://n8n.example.com/webhook/...">
                         </div>
+                        <div class="col-12">
+                            <input type="url" id="chat_webhook_url" class="form-control" placeholder="https://n8n.example.com/webhook/.../chat">
+                        </div>
                         <div class="col-12 d-grid">
-                            <button type="submit" class="btn btn-accent">Save Webhook URL</button>
+                            <button type="submit" class="btn btn-accent">Save Webhook URLs</button>
+                        </div>
+                        <div class="col-12 d-grid">
+                            <button type="button" id="test-chat-webhook" class="btn btn-outline-dark bt-test-chat-webhook">Test Chat Webhook</button>
                         </div>
                     </form>
-                    <p class="small text-muted mt-3 mb-0">Each client submission triggers a REST request to this URL.</p>
+                    <p class="small text-muted mt-3 mb-0">Top URL handles appointments. Chat URL handles the public AI chat widget.</p>
                     <hr>
                     <h3 class="h6">Appointment Status Chart</h3>
                     <canvas id="appointments-chart" height="180"></canvas>
@@ -163,8 +169,11 @@ get_header();
                                             <div class="col-sm-8 col-lg-7">
                                                 <input type="text" class="form-control form-control-sm" id="chatbot-api-key" placeholder="Enter OpenAI API Key" autocomplete="off">
                                             </div>
-                                            <div class="col-sm-4 col-lg-3 d-grid">
+                                            <div class="col-sm-4 col-lg-2 d-grid">
                                                 <button type="submit" class="btn btn-sm btn-outline-dark">Save API Key</button>
+                                            </div>
+                                            <div class="col-sm-12 col-lg-3 d-grid">
+                                                <button type="button" id="test-chat-webhook-inline" class="btn btn-sm btn-outline-secondary bt-test-chat-webhook">Test Chat Webhook</button>
                                             </div>
                                         </form>
                                     </td>

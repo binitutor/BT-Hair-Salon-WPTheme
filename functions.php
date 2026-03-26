@@ -523,6 +523,16 @@ function bt_hair_register_rest_routes() {
 
     register_rest_route(
         'bt-hair/v1',
+        '/settings/test-chat',
+        array(
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => 'bt_hair_rest_settings_test_chat',
+            'permission_callback' => 'bt_hair_can_manage',
+        )
+    );
+
+    register_rest_route(
+        'bt-hair/v1',
         '/chat',
         array(
             'methods'             => WP_REST_Server::CREATABLE,
@@ -729,6 +739,54 @@ function bt_hair_send_n8n_webhook( $payload ) {
 }
 
 /**
+ * Build possible chat webhook URL variants.
+ *
+ * Supports n8n production/test path variants and optional /chat suffix.
+ *
+ * @param string $url Base chat webhook URL.
+ * @return array<int, string>
+ */
+function bt_hair_chat_webhook_candidates( $url ) {
+    $url = trim( (string) $url );
+    if ( '' === $url ) {
+        return array();
+    }
+
+    $variants = array( $url );
+
+    if ( false !== strpos( $url, '/webhook/' ) ) {
+        $variants[] = str_replace( '/webhook/', '/webhook-test/', $url );
+    } elseif ( false !== strpos( $url, '/webhook-test/' ) ) {
+        $variants[] = str_replace( '/webhook-test/', '/webhook/', $url );
+    }
+
+    $expanded = array();
+    foreach ( $variants as $variant ) {
+        $expanded[] = $variant;
+
+        if ( preg_match( '#/chat/?$#i', $variant ) ) {
+            $expanded[] = preg_replace( '#/chat/?$#i', '', $variant );
+        } else {
+            $expanded[] = rtrim( $variant, '/' ) . '/chat';
+        }
+    }
+
+    $final = array();
+    foreach ( $expanded as $candidate ) {
+        $candidate = trim( (string) $candidate );
+        if ( '' === $candidate ) {
+            continue;
+        }
+
+        if ( bt_hair_is_valid_webhook_url( $candidate ) && ! in_array( $candidate, $final, true ) ) {
+            $final[] = $candidate;
+        }
+    }
+
+    return $final;
+}
+
+/**
  * Handle AI chat message: proxy to configured n8n chat webhook.
  *
  * @param WP_REST_Request $request Request.
@@ -748,27 +806,54 @@ function bt_hair_rest_chat( WP_REST_Request $request ) {
 
     $url = trim( (string) get_option( 'bt_hair_n8n_chat_webhook_url', '' ) );
 
-    if ( '' === $url || ! bt_hair_is_valid_webhook_url( $url ) ) {
+    // Backward-compatible fallback: if chat webhook is not set yet, use the main webhook URL.
+    if ( '' === $url ) {
+        $url = trim( (string) get_option( 'bt_hair_n8n_webhook_url', '' ) );
+    }
+
+    $candidate_urls = bt_hair_chat_webhook_candidates( $url );
+
+    if ( empty( $candidate_urls ) ) {
         return new WP_Error( 'chat_unavailable', 'AI chat is not configured. Please contact the salon directly.', array( 'status' => 503 ) );
     }
 
-    $response = wp_remote_post(
-        $url,
-        array(
-            'headers' => array( 'Content-Type' => 'application/json' ),
-            'body'    => wp_json_encode(
-                array(
-                    'message'    => $message,
-                    'session_id' => $session_id,
-                    'api_key'    => (string) get_option( 'bt_hair_chatbot_api_key', '' ),
-                )
-            ),
-            'timeout' => 30,
-        )
-    );
+    $response    = null;
+    $status_code = 0;
 
-    if ( is_wp_error( $response ) ) {
+    foreach ( $candidate_urls as $candidate_url ) {
+        $try_response = wp_remote_post(
+            $candidate_url,
+            array(
+                'headers' => array( 'Content-Type' => 'application/json' ),
+                'body'    => wp_json_encode(
+                    array(
+                        'message'    => $message,
+                        'session_id' => $session_id,
+                        'api_key'    => (string) get_option( 'bt_hair_chatbot_api_key', '' ),
+                    )
+                ),
+                'timeout' => 30,
+            )
+        );
+
+        if ( is_wp_error( $try_response ) ) {
+            continue;
+        }
+
+        $response    = $try_response;
+        $status_code = (int) wp_remote_retrieve_response_code( $try_response );
+
+        if ( $status_code >= 200 && $status_code < 300 ) {
+            break;
+        }
+    }
+
+    if ( ! $response ) {
         return new WP_Error( 'chat_error', 'Unable to reach AI agent. Please try again later.', array( 'status' => 502 ) );
+    }
+
+    if ( $status_code < 200 || $status_code >= 300 ) {
+        return new WP_Error( 'chat_error', 'AI agent returned an unexpected response. Please check the n8n chat webhook URL and workflow activation.', array( 'status' => 502 ) );
     }
 
     $body = wp_remote_retrieve_body( $response );
@@ -1202,4 +1287,93 @@ function bt_hair_rest_settings_save( WP_REST_Request $request ) {
     update_option( 'bt_hair_chatbot_enabled', $chatbot_enabled );
 
     return rest_ensure_response( array( 'success' => true ) );
+}
+
+/**
+ * Test chat webhook from dashboard settings.
+ *
+ * @param WP_REST_Request $request Request.
+ * @return WP_REST_Response|WP_Error
+ */
+function bt_hair_rest_settings_test_chat( WP_REST_Request $request ) {
+    $chat_url = $request->has_param( 'chat_webhook_url' ) ? trim( (string) $request->get_param( 'chat_webhook_url' ) ) : trim( (string) get_option( 'bt_hair_n8n_chat_webhook_url', '' ) );
+    $url      = $request->has_param( 'webhook_url' ) ? trim( (string) $request->get_param( 'webhook_url' ) ) : trim( (string) get_option( 'bt_hair_n8n_webhook_url', '' ) );
+
+    if ( '' === $chat_url ) {
+        $chat_url = $url;
+    }
+
+    if ( '' === $chat_url || ! bt_hair_is_valid_webhook_url( $chat_url ) ) {
+        return new WP_Error( 'invalid_chat_url', 'Chat Webhook URL is invalid or empty.', array( 'status' => 400 ) );
+    }
+
+    $attempt_urls = bt_hair_chat_webhook_candidates( $chat_url );
+
+    if ( empty( $attempt_urls ) ) {
+        return new WP_Error( 'invalid_chat_url', 'Chat Webhook URL is invalid or empty.', array( 'status' => 400 ) );
+    }
+
+    $status_code = 0;
+    $body        = '';
+    $used_url    = $attempt_urls[0];
+
+    foreach ( $attempt_urls as $candidate_url ) {
+        $response = wp_remote_post(
+            $candidate_url,
+            array(
+                'headers' => array( 'Content-Type' => 'application/json' ),
+                'body'    => wp_json_encode(
+                    array(
+                        'message'    => 'Dashboard connectivity test',
+                        'session_id' => 'dashboard-test',
+                        'api_key'    => (string) get_option( 'bt_hair_chatbot_api_key', '' ),
+                        'test'       => true,
+                    )
+                ),
+                'timeout' => 20,
+            )
+        );
+
+        if ( is_wp_error( $response ) ) {
+            continue;
+        }
+
+        $status_code = (int) wp_remote_retrieve_response_code( $response );
+        $body        = (string) wp_remote_retrieve_body( $response );
+        $used_url    = $candidate_url;
+
+        if ( $status_code >= 200 && $status_code < 300 ) {
+            break;
+        }
+    }
+
+    if ( 0 === $status_code ) {
+        return new WP_Error( 'chat_test_failed', 'Unable to reach chat webhook.', array( 'status' => 502 ) );
+    }
+
+    $data        = json_decode( $body, true );
+
+    $reply = '';
+    if ( is_array( $data ) ) {
+        $reply = (string) ( $data['reply'] ?? $data['output'] ?? $data['message'] ?? $data['response'] ?? $data['text'] ?? '' );
+    }
+
+    if ( '' === $reply ) {
+        $reply = trim( $body );
+    }
+
+    $hint = '';
+    if ( 404 === $status_code ) {
+        $hint = 'n8n returned 404. Confirm workflow is active and URL path matches webhook mode (webhook vs webhook-test).';
+    }
+
+    return rest_ensure_response(
+        array(
+            'success'     => $status_code >= 200 && $status_code < 300,
+            'status_code' => $status_code,
+            'reply'       => $reply,
+            'used_url'    => $used_url,
+            'hint'        => $hint,
+        )
+    );
 }

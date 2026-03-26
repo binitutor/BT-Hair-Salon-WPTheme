@@ -164,6 +164,7 @@
         state.slots = slots;
         state.appointments = appointments;
         $("#webhook_url").val(settings.webhook_url || "");
+        $("#chat_webhook_url").val(settings.chat_webhook_url || "");
         renderChatbotFeature(settings);
 
         renderServices();
@@ -296,12 +297,13 @@
         event.preventDefault();
 
         const payload = {
-            webhook_url: $("#webhook_url").val().trim()
+            webhook_url: $("#webhook_url").val().trim(),
+            chat_webhook_url: $("#chat_webhook_url").val().trim()
         };
 
         try {
             await api("settings", "POST", payload);
-            Swal.fire("Saved", "Webhook URL updated.", "success");
+            Swal.fire("Saved", "Webhook URLs updated.", "success");
         } catch (error) {
             Swal.fire("Error", error.message, "error");
         }
@@ -319,6 +321,40 @@
             Swal.fire("Saved", "Chatbot API key updated.", "success");
         } catch (error) {
             Swal.fire("Error", error.message, "error");
+        }
+    }
+
+    async function testChatWebhook() {
+        const payload = {
+            webhook_url: $("#webhook_url").val().trim(),
+            chat_webhook_url: $("#chat_webhook_url").val().trim()
+        };
+
+        try {
+            const result = await api("settings/test-chat", "POST", payload);
+            const usedUrl = (result.used_url || "").trim();
+            const hint = (result.hint || "").trim();
+
+            if (result.success) {
+                const replyText = (result.reply || "").trim();
+                const message = replyText
+                    ? `Connected successfully (HTTP ${result.status_code}). Sample response: ${replyText}`
+                    : `Connected successfully (HTTP ${result.status_code}).`;
+                const detail = usedUrl ? `${message}\n\nURL used: ${usedUrl}` : message;
+                Swal.fire("Chat Webhook OK", detail, "success");
+                return;
+            }
+
+            let failMessage = `Webhook responded with HTTP ${result.status_code}.`;
+            if (usedUrl) {
+                failMessage += `\n\nURL used: ${usedUrl}`;
+            }
+            if (hint) {
+                failMessage += `\n\n${hint}`;
+            }
+            Swal.fire("Test Failed", failMessage, "error");
+        } catch (error) {
+            Swal.fire("Test Failed", error.message, "error");
         }
     }
 
@@ -345,6 +381,7 @@
         $("#service-form").on("submit", createService);
         $("#slot-form").on("submit", createSlot);
         $("#settings-form").on("submit", saveSettings);
+        $(".bt-test-chat-webhook").on("click", testChatWebhook);
         $("#chatbot-settings-form").on("submit", saveChatbotApiKey);
         $("#chatbot-toggle").on("change", toggleChatbot);
         $("#refresh-dashboard").on("click", loadDashboard);
