@@ -696,17 +696,6 @@ function bt_hair_rest_public_options() {
         ARRAY_A
     );
 
-    if ( empty( $slots ) ) {
-        // Fallback for local/demo environments where all configured slots are in the past.
-        $slots = $wpdb->get_results(
-            "SELECT id, slot_start, slot_end, label
-            FROM {$tables['slots']}
-            WHERE is_active = 1
-            ORDER BY slot_start ASC",
-            ARRAY_A
-        );
-    }
-
     return rest_ensure_response(
         array(
             'services' => $services,
