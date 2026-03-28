@@ -100,8 +100,14 @@ get_header();
                             form submission webhook URL
                             <input type="url" id="service_webhook_url" class="form-control" placeholder="https://n8n.example.com/webhook/...">
                         </div>
-                        <div class="col-12 d-grid border-bottom pb-3 mb-3">
+                        <div class="col-12 d-grid">
                             <button type="button" id="test-service-webhook" class="btn btn-outline-dark bt-test-service-webhook">Test Service Webhook</button>
+                        </div>
+                        <div class="col-6 d-grid border-bottom pb-3 mb-3">
+                            <button type="button" id="test-service-webhook-accept" class="btn btn-outline-dark bt-test-service-webhook">Test Service Accepted Webhook</button>
+                        </div>
+                        <div class="col-6 d-grid border-bottom pb-3 mb-3">
+                            <button type="button" id="test-service-webhook-reject" class="btn btn-outline-dark bt-test-service-webhook">Test Service Rejected Webhook</button>
                         </div>
 
                         <div class="col-12">

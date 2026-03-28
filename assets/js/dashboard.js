@@ -320,6 +320,30 @@
     async function updateAppointmentStatus(id, status) {
         try {
             await api(`appointments/${id}/status`, "POST", { status });
+
+            const webhookUrl = $("#service_webhook_url").val().trim();
+            if (webhookUrl) {
+                const appt = state.appointments.find((a) => Number(a.id) === Number(id));
+                if (appt) {
+                    const n8nStatus = status === "accepted" ? "approved" : "rejected";
+                    fetch(webhookUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            status: n8nStatus,
+                            id: appt.id,
+                            full_name: appt.full_name,
+                            email: appt.email,
+                            phone: appt.phone,
+                            service_name: appt.service_name,
+                            slot_label: appt.slot_label,
+                            appointment_start: appt.appointment_start,
+                            appointment_end: appt.appointment_end
+                        })
+                    }).catch(() => {});
+                }
+            }
+
             await loadDashboard();
         } catch (error) {
             Swal.fire("Error", error.message, "error");
@@ -466,6 +490,52 @@
                 failMessage += `\n\n${hint}`;
             }
             Swal.fire("Test Failed", failMessage, "error");
+        } catch (error) {
+            Swal.close();
+            Swal.fire("Test Failed", error.message, "error");
+        }
+    }
+
+    const TEST_APPT_SAMPLE = {
+        id: 12,
+        full_name: "Jane Doe",
+        email: "jane@example.com",
+        phone: "0911000000",
+        service_name: "Hair Cut",
+        slot_label: "03/28/2026 4:30PM - 5:30PM",
+        appointment_start: "2026-03-28 16:30:00",
+        appointment_end: "2026-03-28 17:30:00"
+    };
+
+    async function testStatusWebhook(status) {
+        const webhookUrl = $("#service_webhook_url").val().trim();
+        if (!webhookUrl) {
+            Swal.fire("No URL", "Please enter a service webhook URL first.", "warning");
+            return;
+        }
+
+        const payload = Object.assign({ status }, TEST_APPT_SAMPLE);
+
+        Swal.fire({
+            title: `Testing ${status.charAt(0).toUpperCase() + status.slice(1)} Webhook...`,
+            text: "Please wait while we contact your n8n workflow.",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
+
+        try {
+            const response = await fetch(webhookUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            Swal.close();
+            if (response.ok) {
+                Swal.fire("Webhook OK", `HTTP ${response.status} — payload sent with status: "${status}".`, "success");
+            } else {
+                Swal.fire("Test Failed", `Webhook responded with HTTP ${response.status}.`, "error");
+            }
         } catch (error) {
             Swal.close();
             Swal.fire("Test Failed", error.message, "error");
@@ -746,7 +816,9 @@
         $("#slot-form").on("submit", createSlot);
         $("#settings-form").on("submit", saveSettings);
         $(".bt-test-chat-webhook").on("click", testChatWebhook);
-        $(".bt-test-service-webhook").on("click", testServiceWebhook);
+        $("#test-service-webhook").on("click", testServiceWebhook);
+        $("#test-service-webhook-accept").on("click", () => testStatusWebhook("approved"));
+        $("#test-service-webhook-reject").on("click", () => testStatusWebhook("declined"));
         $(".bt-generate-api-key").on("click", generateCallbackAuth);
         $(".bt-view-callback-logs").on("click", viewCallbackLogs);
         $("#chatbot-settings-form").on("submit", saveChatbotApiKey);

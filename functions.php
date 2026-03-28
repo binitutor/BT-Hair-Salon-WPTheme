@@ -1428,6 +1428,8 @@ function bt_hair_rest_appointments_list() {
             a.status,
             a.created_at,
             a.slot_id,
+            a.appointment_start,
+            a.appointment_end,
             s.service_name,
             s.price,
             sl.label AS slot_label
