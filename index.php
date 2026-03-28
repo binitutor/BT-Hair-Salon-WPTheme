@@ -92,7 +92,7 @@ get_header();
                                     </select>
                                 </div>
                                 <div class="col-12">
-                                    <label for="slot_id" class="form-label">Appointment Date and Time</label>
+                                    <label for="slot_id" class="form-label">Appointment Date and Time <small class="text-muted">EST</small></label>
                                     <select id="slot_id" class="form-select" required>
                                         <option value="">Choose an available slot</option>
                                     </select>

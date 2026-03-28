@@ -325,7 +325,7 @@
             if (webhookUrl) {
                 const appt = state.appointments.find((a) => Number(a.id) === Number(id));
                 if (appt) {
-                    const n8nStatus = status === "accepted" ? "approved" : "rejected";
+                    const n8nStatus = status === "accepted" ? "approved" : "declined";
                     fetch(webhookUrl, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },

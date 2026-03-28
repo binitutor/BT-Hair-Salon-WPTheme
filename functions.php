@@ -463,6 +463,25 @@ function bt_hair_can_manage() {
 }
 
 /**
+ * Canonical timezone for appointment slots.
+ *
+ * @return DateTimeZone
+ */
+function bt_hair_slot_timezone() {
+    return new DateTimeZone( 'America/New_York' );
+}
+
+/**
+ * Current datetime in slot timezone (EST/EDT).
+ *
+ * @return string
+ */
+function bt_hair_slot_now_mysql() {
+    $now = new DateTimeImmutable( 'now', bt_hair_slot_timezone() );
+    return $now->format( 'Y-m-d H:i:s' );
+}
+
+/**
  * Build a human-readable label from DB datetimes.
  *
  * @param string $start Datetime start.
@@ -470,7 +489,15 @@ function bt_hair_can_manage() {
  * @return string
  */
 function bt_hair_slot_label( $start, $end ) {
-    return wp_date( 'm/d/Y g:iA', strtotime( $start ) ) . ' - ' . wp_date( 'g:iA', strtotime( $end ) );
+    $timezone = bt_hair_slot_timezone();
+    $start_dt = date_create_immutable_from_format( 'Y-m-d H:i:s', (string) $start, $timezone );
+    $end_dt   = date_create_immutable_from_format( 'Y-m-d H:i:s', (string) $end, $timezone );
+
+    if ( ! $start_dt || ! $end_dt ) {
+        return (string) $start . ' - ' . (string) $end . ' EST';
+    }
+
+    return $start_dt->format( 'm/d/Y g:iA' ) . ' - ' . $end_dt->format( 'g:iA' ) . ' EST';
 }
 
 /**
@@ -683,7 +710,7 @@ function bt_hair_rest_public_options() {
     global $wpdb;
 
     $tables   = bt_hair_tables();
-    $now      = current_time( 'mysql' );
+    $now      = bt_hair_slot_now_mysql();
     $services = $wpdb->get_results( "SELECT id, service_name, price FROM {$tables['services']} ORDER BY service_name ASC", ARRAY_A );
     $slots    = $wpdb->get_results(
         $wpdb->prepare(
@@ -751,7 +778,7 @@ function bt_hair_rest_submit_appointment( WP_REST_Request $request ) {
         return new WP_Error( 'slot_not_found', 'Selected appointment slot is not available.', array( 'status' => 404 ) );
     }
 
-    if ( strtotime( $slot['slot_start'] ) < strtotime( current_time( 'mysql' ) ) ) {
+    if ( strtotime( $slot['slot_start'] ) < strtotime( bt_hair_slot_now_mysql() ) ) {
         return new WP_Error( 'slot_expired', 'Selected appointment slot has already passed.', array( 'status' => 409 ) );
     }
 
@@ -1318,7 +1345,7 @@ function bt_hair_rest_slots_create( WP_REST_Request $request ) {
         return new WP_Error( 'invalid_slot', 'Date, start time and end time are required.', array( 'status' => 400 ) );
     }
 
-    $timezone = wp_timezone();
+    $timezone = bt_hair_slot_timezone();
     $start_dt = date_create_immutable_from_format( 'Y-m-d H:i', $date . ' ' . $start_time, $timezone );
     $end_dt   = date_create_immutable_from_format( 'Y-m-d H:i', $date . ' ' . $end_time, $timezone );
 

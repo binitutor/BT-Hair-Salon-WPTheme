@@ -61,7 +61,7 @@ get_header();
         <div class="col-xl-4">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <h2 class="h5 mb-3"><i class="fa-regular fa-calendar"></i> Availability Slots</h2>
+                    <h2 class="h5 mb-3"><i class="fa-regular fa-calendar"></i> Availability Slots <small class="text-muted">EST</small></h2>
                     <form id="slot-form" class="row g-2 mb-3">
                         <div class="col-12">
                             <input type="date" id="slot_date" class="form-control" required>
@@ -80,7 +80,7 @@ get_header();
                         <table class="table table-sm align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th>Slot</th>
+                                    <th>Slot <small class="text-muted">EST</small></th>
                                     <th class="text-end">Action</th>
                                 </tr>
                             </thead>
@@ -154,7 +154,7 @@ get_header();
                                     <th>Client</th>
                                     <th>Contact</th>
                                     <th>Service</th>
-                                    <th>Date & Time</th>
+                                    <th>Date & Time <small class="text-muted">EST</small></th>
                                     <th>Status</th>
                                     <th class="text-end">Actions</th>
                                 </tr>
