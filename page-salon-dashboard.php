@@ -108,14 +108,15 @@ get_header();
                             chat widget webhook URL
                             <input type="url" id="chat_webhook_url" class="form-control" placeholder="https://n8n.example.com/webhook/.../chat">
                         </div>
-                        <div class="form-check form-switch">
-                            Secure <input class="form-check-input" type="checkbox" role="switch" id="chatbot-protected-toggle" checked>
-                        </div>
-                        <div class="col-12 d-grid">
+                        <div class="col-12 d-grid border-bottom pb-3 mb-3">
                             <button type="button" id="test-chat-webhook" class="btn btn-outline-dark bt-test-chat-webhook">Test Chat Webhook</button>
                         </div>
-                        <div class="col-12 d-grid border-bottom pb-3 mb-3">
+
+                        <div class="col-12 d-grid">
                             <button type="button" id="generate-api-key" class="btn btn-outline-dark bt-generate-api-key">Generate API Key for callback</button>
+                        </div>
+                        <div class="form-check form-switch">
+                            Secure <input class="form-check-input" type="checkbox" role="switch" id="chatbot-protected-toggle" checked>
                         </div>
                         <div class="col-12 d-grid border-bottom pb-3 mb-3">
                             <button type="button" id="view-callback-logs" class="btn btn-outline-secondary bt-view-callback-logs">View Callback Logs</button>

@@ -696,6 +696,17 @@ function bt_hair_rest_public_options() {
         ARRAY_A
     );
 
+    if ( empty( $slots ) ) {
+        // Fallback for local/demo environments where all configured slots are in the past.
+        $slots = $wpdb->get_results(
+            "SELECT id, slot_start, slot_end, label
+            FROM {$tables['slots']}
+            WHERE is_active = 1
+            ORDER BY slot_start ASC",
+            ARRAY_A
+        );
+    }
+
     return rest_ensure_response(
         array(
             'services' => $services,
@@ -1012,6 +1023,14 @@ function bt_hair_log_chat_callback_event( $entry ) {
  */
 function bt_hair_rest_chat_callback_can_post( WP_REST_Request $request ) {
     $is_protected = '1' === (string) get_option( 'bt_hair_chatbot_protected', '1' );
+    $session_id    = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+
+    $log_base = array(
+        'time'       => current_time( 'mysql' ),
+        'remote_ip'  => sanitize_text_field( (string) $request->get_header( 'x-forwarded-for' ) ?: (string) $request->get_header( 'x-real-ip' ) ?: (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) ),
+        'user_agent' => sanitize_text_field( substr( (string) $request->get_header( 'user-agent' ), 0, 190 ) ),
+        'session_id' => $session_id,
+    );
 
     if ( ! $is_protected ) {
         // Explicitly allow open callback mode when Secure toggle is off.
@@ -1019,6 +1038,16 @@ function bt_hair_rest_chat_callback_can_post( WP_REST_Request $request ) {
     }
 
     if ( ! current_user_can( 'manage_options' ) ) {
+        bt_hair_log_chat_callback_event(
+            array_merge(
+                $log_base,
+                array(
+                    'status' => 'error',
+                    'result' => 'auth_failed',
+                    'note'   => 'Callback auth failed (application password or user capability).',
+                )
+            )
+        );
         return new WP_Error( 'forbidden', 'Authentication failed for callback endpoint.', array( 'status' => 401 ) );
     }
 
@@ -1026,10 +1055,30 @@ function bt_hair_rest_chat_callback_can_post( WP_REST_Request $request ) {
     $sent_key  = trim( (string) $request->get_header( 'x-bt-chatbot-callback-key' ) );
 
     if ( '' === $saved_key ) {
+        bt_hair_log_chat_callback_event(
+            array_merge(
+                $log_base,
+                array(
+                    'status' => 'error',
+                    'result' => 'callback_key_missing',
+                    'note'   => 'Callback key is not configured in WordPress.',
+                )
+            )
+        );
         return new WP_Error( 'callback_key_missing', 'Callback key is not configured. Generate one from dashboard first.', array( 'status' => 400 ) );
     }
 
     if ( '' === $sent_key || ! hash_equals( $saved_key, $sent_key ) ) {
+        bt_hair_log_chat_callback_event(
+            array_merge(
+                $log_base,
+                array(
+                    'status' => 'error',
+                    'result' => 'invalid_callback_key',
+                    'note'   => 'Invalid or missing X-BT-Chatbot-Callback-Key.',
+                )
+            )
+        );
         return new WP_Error( 'invalid_callback_key', 'Invalid callback key.', array( 'status' => 403 ) );
     }
 
@@ -1559,46 +1608,66 @@ function bt_hair_rest_settings_save( WP_REST_Request $request ) {
 function bt_hair_rest_settings_test_chat( WP_REST_Request $request ) {
     $chat_url = $request->has_param( 'chat_webhook_url' ) ? trim( (string) $request->get_param( 'chat_webhook_url' ) ) : trim( (string) get_option( 'bt_hair_n8n_chat_webhook_url', '' ) );
 
-    $attempt_urls = bt_hair_chat_webhook_mode_candidates( $chat_url );
+    $attempt_urls = bt_hair_chat_webhook_candidates( $chat_url );
 
     if ( empty( $attempt_urls ) ) {
         return new WP_Error( 'invalid_chat_url', 'Chat Webhook URL is invalid or empty.', array( 'status' => 400 ) );
     }
 
-    $status_code = 0;
-    $body        = '';
-    $used_url    = $attempt_urls[0];
+    $status_code   = 0;
+    $body          = '';
+    $used_url      = $attempt_urls[0];
+    $used_payload  = array();
+    $used_format   = '';
     $attempt_count = 0;
 
-    // Construct test payload with session_id included
-    $test_payload = array(
-        'message'    => 'Dashboard connectivity test',
-        'session_id' => 'dashboard-test',
-        'api_key'    => (string) get_option( 'bt_hair_chatbot_api_key', '' ),
-        'test'       => true,
+    $test_payloads = array(
+        'wp_message' => array(
+            'message'    => 'Dashboard connectivity test',
+            'session_id' => 'dashboard-test',
+            'api_key'    => (string) get_option( 'bt_hair_chatbot_api_key', '' ),
+            'test'       => true,
+        ),
+        'n8n_chat_widget' => array(
+            'action'    => 'sendMessage',
+            'chatInput' => 'Dashboard connectivity test',
+            'sessionId' => 'dashboard-test',
+            'metadata'  => array(
+                'source' => 'dashboard-chat-test',
+            ),
+            'test'      => true,
+        ),
+        'simple_message' => array(
+            'message' => 'Dashboard connectivity test',
+            'test'    => true,
+        ),
     );
 
     foreach ( $attempt_urls as $candidate_url ) {
-        $attempt_count++;
-        $response = wp_remote_post(
-            $candidate_url,
-            array(
-                'headers' => array( 'Content-Type' => 'application/json' ),
-                'body'    => wp_json_encode( $test_payload ),
-                'timeout' => 20,
-            )
-        );
+        foreach ( $test_payloads as $format => $test_payload ) {
+            $attempt_count++;
+            $response = wp_remote_post(
+                $candidate_url,
+                array(
+                    'headers' => array( 'Content-Type' => 'application/json' ),
+                    'body'    => wp_json_encode( $test_payload ),
+                    'timeout' => 20,
+                )
+            );
 
-        if ( is_wp_error( $response ) ) {
-            continue;
-        }
+            if ( is_wp_error( $response ) ) {
+                continue;
+            }
 
-        $status_code = (int) wp_remote_retrieve_response_code( $response );
-        $body        = (string) wp_remote_retrieve_body( $response );
-        $used_url    = $candidate_url;
+            $status_code  = (int) wp_remote_retrieve_response_code( $response );
+            $body         = (string) wp_remote_retrieve_body( $response );
+            $used_url     = $candidate_url;
+            $used_payload = $test_payload;
+            $used_format  = $format;
 
-        if ( $status_code >= 200 && $status_code < 300 ) {
-            break;
+            if ( $status_code >= 200 && $status_code < 300 ) {
+                break 2;
+            }
         }
     }
 
@@ -1606,11 +1675,16 @@ function bt_hair_rest_settings_test_chat( WP_REST_Request $request ) {
         return new WP_Error( 'chat_test_failed', 'Unable to reach chat webhook. Verified ' . $attempt_count . ' URL variant(s). Check n8n webhook URL and workflow activation.', array( 'status' => 502 ) );
     }
 
-    $data        = json_decode( $body, true );
+    $data = json_decode( $body, true );
 
     $reply = '';
     if ( is_array( $data ) ) {
-        $reply = (string) ( $data['reply'] ?? $data['output'] ?? $data['message'] ?? $data['response'] ?? $data['text'] ?? '' );
+        $primary = $data;
+        if ( isset( $data[0] ) && is_array( $data[0] ) ) {
+            $primary = $data[0];
+        }
+
+        $reply = (string) ( $primary['reply'] ?? $primary['output'] ?? $primary['message'] ?? $primary['response'] ?? $primary['text'] ?? '' );
     }
 
     if ( '' === $reply ) {
@@ -1619,9 +1693,9 @@ function bt_hair_rest_settings_test_chat( WP_REST_Request $request ) {
 
     $hint = '';
     if ( 404 === $status_code ) {
-        $hint = 'n8n returned 404. TROUBLESHOOTING: (1) Verify n8n has an active webhook at this URL; (2) If using /webhook-test/, ensure workflow is listening for test events; (3) Check that the webhook path exactly matches what you configured in n8n; (4) Test payload includes session_id="' . htmlspecialchars( 'dashboard-test' ) . '" - confirm n8n workflow receives this field.';
+        $hint = 'n8n returned 404. TROUBLESHOOTING: (1) Verify n8n has an active webhook at this URL; (2) Confirm the URL path exactly matches your published webhook; (3) If your workflow uses /chat, ensure that suffix is present; (4) Check n8n execution logs for incoming test calls.';
     } elseif ( $status_code >= 400 ) {
-        $hint = 'n8n returned ' . $status_code . '. Check n8n workflow logs. Test payload sent: message, session_id, api_key, test flag.';
+        $hint = 'n8n returned ' . $status_code . '. Check n8n workflow logs. The test tried multiple payload formats to match different chat workflow schemas.';
     }
 
     return rest_ensure_response(
@@ -1630,8 +1704,9 @@ function bt_hair_rest_settings_test_chat( WP_REST_Request $request ) {
             'status_code' => $status_code,
             'reply'       => $reply,
             'used_url'    => $used_url,
+            'used_format' => $used_format,
             'hint'        => $hint,
-            'payload'     => $test_payload,
+            'payload'     => $used_payload,
         )
     );
 }
@@ -1791,6 +1866,7 @@ function bt_hair_rest_settings_generate_callback_auth( WP_REST_Request $request 
 function bt_hair_rest_chat_callback( WP_REST_Request $request ) {
     $session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
     $reply      = trim( (string) $request->get_param( 'reply' ) );
+    $result     = sanitize_text_field( (string) $request->get_param( 'result' ) );
 
     $log_base = array(
         'time'       => current_time( 'mysql' ),
@@ -1805,6 +1881,7 @@ function bt_hair_rest_chat_callback( WP_REST_Request $request ) {
                 $log_base,
                 array(
                     'status' => 'error',
+                    'result' => 'error',
                     'note'   => 'Missing session_id',
                 )
             )
@@ -1822,12 +1899,19 @@ function bt_hair_rest_chat_callback( WP_REST_Request $request ) {
                 $log_base,
                 array(
                     'status' => 'error',
+                    'result' => 'error',
                     'note'   => 'Missing reply',
                 )
             )
         );
         return new WP_Error( 'invalid_reply', 'reply is required.', array( 'status' => 400 ) );
     }
+
+    if ( '' === $result ) {
+        $result = 'success';
+    }
+
+    $reply_preview = sanitize_text_field( substr( $reply, 0, 180 ) );
 
     set_transient( bt_hair_chat_reply_transient_key( $session_id ), $reply, MINUTE_IN_SECONDS * 10 );
 
@@ -1836,7 +1920,9 @@ function bt_hair_rest_chat_callback( WP_REST_Request $request ) {
             $log_base,
             array(
                 'status'       => 'ok',
+                'result'       => $result,
                 'reply_length' => strlen( $reply ),
+                'reply_preview' => $reply_preview,
             )
         )
     );

@@ -364,7 +364,18 @@
         };
 
         try {
+            Swal.fire({
+                title: "Testing Chat Webhook...",
+                text: "Please wait while we contact your n8n workflow.",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
             const result = await api("settings/test-chat", "POST", payload);
+            Swal.close();
             const usedUrl = (result.used_url || "").trim();
             const hint = (result.hint || "").trim();
             const testPayload = result.payload || {};
@@ -411,6 +422,7 @@
                 }
             });
         } catch (error) {
+            Swal.close();
             Swal.fire("Test Failed", error.message, "error");
         }
     }
@@ -421,7 +433,18 @@
         };
 
         try {
+            Swal.fire({
+                title: "Testing Service Webhook...",
+                text: "Please wait while we contact your n8n workflow.",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
             const result = await api("settings/test-service", "POST", payload);
+            Swal.close();
             const usedUrl = (result.used_url || "").trim();
             const hint = (result.hint || "").trim();
 
@@ -444,6 +467,7 @@
             }
             Swal.fire("Test Failed", failMessage, "error");
         } catch (error) {
+            Swal.close();
             Swal.fire("Test Failed", error.message, "error");
         }
     }
@@ -580,7 +604,7 @@
                 });
 
                 if (!filtered.length) {
-                    return `<tr><td colspan="6" class="text-muted">No ${escapeHtml(filterStatus.toUpperCase())} logs in this view.</td></tr>`;
+                    return `<tr><td colspan="7" class="text-muted">No ${escapeHtml(filterStatus.toUpperCase())} logs in this view.</td></tr>`;
                 }
 
                 return filtered.map((log) => {
@@ -590,6 +614,7 @@
                     const ip = escapeHtml(log.remote_ip || "");
                     const note = escapeHtml(log.note || "");
                     const len = escapeHtml(String(log.reply_length || ""));
+                    const result = escapeHtml(log.result || log.reply_preview || "");
 
                     return `<tr>
                         <td>${time}</td>
@@ -597,6 +622,7 @@
                         <td>${session}</td>
                         <td>${ip}</td>
                         <td>${len}</td>
+                        <td>${result}</td>
                         <td>${note}</td>
                     </tr>`;
                 }).join("");
@@ -620,6 +646,7 @@
                                     <th>Session</th>
                                     <th>IP</th>
                                     <th>Reply Len</th>
+                                    <th>Result</th>
                                     <th>Note</th>
                                 </tr>
                             </thead>
