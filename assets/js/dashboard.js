@@ -9,7 +9,12 @@
     };
 
     async function api(path, method, payload) {
-        const response = await fetch(btHairAdmin.restUrl + path, {
+        let normalizedPath = path;
+        if (btHairAdmin.restUrl.indexOf("?") !== -1 && path.indexOf("?") !== -1) {
+            normalizedPath = path.replace("?", "&");
+        }
+
+        const response = await fetch(btHairAdmin.restUrl + normalizedPath, {
             method: method || "GET",
             headers: {
                 "Content-Type": "application/json",
@@ -24,6 +29,32 @@
         }
 
         return data;
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    async function copyText(value) {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(value);
+            return;
+        }
+
+        const helper = document.createElement("textarea");
+        helper.value = value;
+        helper.setAttribute("readonly", "readonly");
+        helper.style.position = "fixed";
+        helper.style.opacity = "0";
+        document.body.appendChild(helper);
+        helper.select();
+        document.execCommand("copy");
+        document.body.removeChild(helper);
     }
 
     function statusBadge(status) {
@@ -147,8 +178,10 @@
 
     function renderChatbotFeature(settings) {
         const enabled = settings.chatbot_enabled === true || settings.chatbot_enabled === 1 || settings.chatbot_enabled === "1";
+        const protectedMode = settings.chatbot_protected === true || settings.chatbot_protected === 1 || settings.chatbot_protected === "1";
         $("#chatbot-api-key").val(settings.chatbot_api_key || "");
         $("#chatbot-toggle").prop("checked", enabled);
+        $("#chatbot-protected-toggle").prop("checked", protectedMode);
         $("#chatbot-status").text(enabled ? "Active" : "Inactive");
     }
 
@@ -163,7 +196,7 @@
         state.services = services;
         state.slots = slots;
         state.appointments = appointments;
-        $("#webhook_url").val(settings.webhook_url || "");
+        $("#service_webhook_url").val(settings.service_webhook_url || settings.webhook_url || "");
         $("#chat_webhook_url").val(settings.chat_webhook_url || "");
         renderChatbotFeature(settings);
 
@@ -297,7 +330,7 @@
         event.preventDefault();
 
         const payload = {
-            webhook_url: $("#webhook_url").val().trim(),
+            service_webhook_url: $("#service_webhook_url").val().trim(),
             chat_webhook_url: $("#chat_webhook_url").val().trim()
         };
 
@@ -326,7 +359,7 @@
 
     async function testChatWebhook() {
         const payload = {
-            webhook_url: $("#webhook_url").val().trim(),
+            service_webhook_url: $("#service_webhook_url").val().trim(),
             chat_webhook_url: $("#chat_webhook_url").val().trim()
         };
 
@@ -334,6 +367,8 @@
             const result = await api("settings/test-chat", "POST", payload);
             const usedUrl = (result.used_url || "").trim();
             const hint = (result.hint || "").trim();
+            const testPayload = result.payload || {};
+            const payloadDisplay = JSON.stringify(testPayload, null, 2);
 
             if (result.success) {
                 const replyText = (result.reply || "").trim();
@@ -352,9 +387,299 @@
             if (hint) {
                 failMessage += `\n\n${hint}`;
             }
+            failMessage += `\n\nTest Payload Sent:\n${payloadDisplay}`;
+            
+            Swal.fire({
+                title: "Test Failed",
+                text: failMessage,
+                icon: "error",
+                width: 700,
+                didOpen: () => {
+                    // Make text pre-formatted to show JSON nicely
+                    const popup = Swal.getPopup();
+                    if (popup) {
+                        const textElement = popup.querySelector('.swal2-html-container');
+                        if (textElement) {
+                            textElement.style.textAlign = "left";
+                            textElement.style.whiteSpace = "pre-wrap";
+                            textElement.style.fontFamily = "monospace";
+                            textElement.style.fontSize = "12px";
+                            textElement.style.maxHeight = "400px";
+                            textElement.style.overflow = "auto";
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            Swal.fire("Test Failed", error.message, "error");
+        }
+    }
+
+    async function testServiceWebhook() {
+        const payload = {
+            service_webhook_url: $("#service_webhook_url").val().trim()
+        };
+
+        try {
+            const result = await api("settings/test-service", "POST", payload);
+            const usedUrl = (result.used_url || "").trim();
+            const hint = (result.hint || "").trim();
+
+            if (result.success) {
+                const replyText = (result.reply || "").trim();
+                const message = replyText
+                    ? `Connected successfully (HTTP ${result.status_code}). Sample response: ${replyText}`
+                    : `Connected successfully (HTTP ${result.status_code}).`;
+                const detail = usedUrl ? `${message}\n\nURL used: ${usedUrl}` : message;
+                Swal.fire("Service Webhook OK", detail, "success");
+                return;
+            }
+
+            let failMessage = `Webhook responded with HTTP ${result.status_code}.`;
+            if (usedUrl) {
+                failMessage += `\n\nURL used: ${usedUrl}`;
+            }
+            if (hint) {
+                failMessage += `\n\n${hint}`;
+            }
             Swal.fire("Test Failed", failMessage, "error");
         } catch (error) {
             Swal.fire("Test Failed", error.message, "error");
+        }
+    }
+
+    async function generateCallbackAuth(forceRegenerate = false) {
+        try {
+            const result = await api("settings/generate-callback-auth", "POST", { force_regenerate: forceRegenerate });
+            const username = (result.wp_username || "").trim();
+            const appPassword = (result.application_password || "").trim();
+            const callbackKey = (result.callback_key || "").trim();
+            const callbackUrl = (result.callback_url || "").trim();
+            const generatedNew = result.generated_new === true || result.generated_new === 1 || result.generated_new === "1";
+            const notice = (result.notice || "").trim();
+
+            const basicToken = username && appPassword
+                ? btoa(`${username}:${appPassword}`)
+                : "";
+
+            const authHeader = basicToken ? `Basic ${basicToken}` : "";
+
+            function fieldBlock(label, id, value, minHeight, extraButtonsHtml = "") {
+                return `
+                    <p class="mt-2"><strong>${escapeHtml(label)}</strong></p>
+                    <textarea id="${id}" readonly style="width:100%;min-height:${minHeight};">${escapeHtml(value)}</textarea>
+                    <div class="d-grid mt-1 ${extraButtonsHtml ? "d-md-flex gap-2" : ""}">
+                        <button type="button" class="btn btn-sm btn-outline-dark bt-copy-field" data-copy-id="${id}">Copy</button>
+                        ${extraButtonsHtml}
+                    </div>
+                `;
+            }
+
+            const appPasswordDisplay = appPassword || "(Not shown for existing credentials. Click Generate New to rotate and create a new application password.)";
+            const callbackExtraButtons = "<button type=\"button\" class=\"btn btn-sm btn-outline-danger bt-force-regenerate\">Generate New</button>";
+
+            Swal.fire({
+                title: generatedNew ? "Callback Credentials Generated" : "Callback Credentials",
+                icon: "success",
+                width: 760,
+                html: `
+                    <div style="text-align:left; font-size:14px;">
+                        ${notice ? `<p class="mb-2 text-muted">${escapeHtml(notice)}</p>` : ""}
+                        ${fieldBlock("Callback URL", "bt-copy-callback-url", callbackUrl, "56px")}
+                        ${fieldBlock("Callback API Key", "bt-copy-callback-key", callbackKey, "56px", callbackExtraButtons)}
+                        ${fieldBlock("WordPress Username", "bt-copy-callback-user", username, "40px")}
+                        ${fieldBlock("Application Password", "bt-copy-callback-pass", appPasswordDisplay, "56px")}
+                        ${fieldBlock("Authorization Header (Basic)", "bt-copy-callback-auth", authHeader, "56px")}
+                        <p class="mt-2 mb-0 text-muted">Save these now. WordPress only shows generated application passwords once.</p>
+                    </div>
+                `,
+                confirmButtonText: "Close",
+                didOpen: () => {
+                    document.querySelectorAll(".bt-copy-field").forEach((button) => {
+                        button.addEventListener("click", async () => {
+                            const fieldId = button.getAttribute("data-copy-id");
+                            const field = fieldId ? document.getElementById(fieldId) : null;
+                            const value = field ? field.value : "";
+                            if (!value) {
+                                return;
+                            }
+
+                            try {
+                                await copyText(value);
+                                const original = button.textContent;
+                                button.textContent = "Copied";
+                                window.setTimeout(() => {
+                                    button.textContent = original;
+                                }, 900);
+                            } catch (copyError) {
+                                Swal.fire("Error", "Unable to copy text automatically.", "error");
+                            }
+                        });
+                    });
+
+                    const regenerateButton = document.querySelector(".bt-force-regenerate");
+                    if (regenerateButton) {
+                        regenerateButton.addEventListener("click", async () => {
+                            const confirm = await Swal.fire({
+                                title: "Generate new callback credentials?",
+                                text: "This will rotate the callback key and create a new WordPress application password.",
+                                icon: "warning",
+                                showCancelButton: true,
+                                confirmButtonText: "Generate New",
+                                cancelButtonText: "Cancel",
+                                confirmButtonColor: "#b91c1c"
+                            });
+
+                            if (!confirm.isConfirmed) {
+                                return;
+                            }
+
+                            Swal.close();
+                            await generateCallbackAuth(true);
+                        });
+                    }
+                }
+            });
+        } catch (error) {
+            Swal.fire("Error", error.message, "error");
+        }
+    }
+
+    async function viewCallbackLogs() {
+        try {
+            const result = await api("chat/callback-logs?limit=30", "GET");
+            const logs = Array.isArray(result.logs) ? result.logs : [];
+
+            if (!logs.length) {
+                Swal.fire("Callback Logs", "No callback logs yet.", "info");
+                return;
+            }
+
+            const badgeStyles = {
+                ok: "background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:999px;font-weight:700;",
+                error: "background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:999px;font-weight:700;",
+                other: "background:#e5e7eb;color:#374151;padding:2px 8px;border-radius:999px;font-weight:700;"
+            };
+
+            function statusBadge(statusRaw) {
+                const status = String(statusRaw || "").toLowerCase();
+                const style = status === "ok"
+                    ? badgeStyles.ok
+                    : (status === "error" ? badgeStyles.error : badgeStyles.other);
+                const label = status ? status.toUpperCase() : "UNKNOWN";
+                return `<span style="${style}">${escapeHtml(label)}</span>`;
+            }
+
+            function buildRows(filterStatus) {
+                const filtered = logs.filter((log) => {
+                    if (filterStatus === "all") {
+                        return true;
+                    }
+
+                    return String(log.status || "").toLowerCase() === filterStatus;
+                });
+
+                if (!filtered.length) {
+                    return `<tr><td colspan="6" class="text-muted">No ${escapeHtml(filterStatus.toUpperCase())} logs in this view.</td></tr>`;
+                }
+
+                return filtered.map((log) => {
+                    const time = escapeHtml(log.time || "");
+                    const status = escapeHtml(log.status || "");
+                    const session = escapeHtml(log.session_id || "");
+                    const ip = escapeHtml(log.remote_ip || "");
+                    const note = escapeHtml(log.note || "");
+                    const len = escapeHtml(String(log.reply_length || ""));
+
+                    return `<tr>
+                        <td>${time}</td>
+                        <td>${statusBadge(status)}</td>
+                        <td>${session}</td>
+                        <td>${ip}</td>
+                        <td>${len}</td>
+                        <td>${note}</td>
+                    </tr>`;
+                }).join("");
+            }
+
+            Swal.fire({
+                title: "Callback Logs",
+                width: 920,
+                html: `
+                    <div class="d-flex gap-2 mb-2" style="text-align:left;">
+                        <button type="button" class="btn btn-sm btn-outline-dark bt-log-filter" data-filter="all">All</button>
+                        <button type="button" class="btn btn-sm btn-outline-success bt-log-filter" data-filter="ok">OK</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger bt-log-filter" data-filter="error">ERROR</button>
+                    </div>
+                    <div style="max-height:420px; overflow:auto; text-align:left;">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                    <th>Session</th>
+                                    <th>IP</th>
+                                    <th>Reply Len</th>
+                                    <th>Note</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bt-callback-logs-body">${buildRows("all")}</tbody>
+                        </table>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: "Clear Logs",
+                cancelButtonText: "Close",
+                confirmButtonColor: "#b91c1c",
+                didOpen: () => {
+                    const tableBody = document.getElementById("bt-callback-logs-body");
+                    const buttons = Array.from(document.querySelectorAll(".bt-log-filter"));
+
+                    function setActiveFilter(filter) {
+                        buttons.forEach((btn) => {
+                            const btnFilter = String(btn.getAttribute("data-filter") || "all").toLowerCase();
+                            const active = btnFilter === filter;
+                            btn.classList.toggle("active", active);
+                            btn.setAttribute("aria-pressed", active ? "true" : "false");
+                        });
+                    }
+
+                    setActiveFilter("all");
+
+                    buttons.forEach((button) => {
+                        button.addEventListener("click", () => {
+                            const filter = String(button.getAttribute("data-filter") || "all").toLowerCase();
+                            if (tableBody) {
+                                tableBody.innerHTML = buildRows(filter);
+                            }
+                            setActiveFilter(filter);
+                        });
+                    });
+                }
+            }).then(async (decision) => {
+                if (!decision.isConfirmed) {
+                    return;
+                }
+
+                const sure = await Swal.fire({
+                    title: "Clear callback logs?",
+                    text: "This removes all stored callback log entries.",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonText: "Yes, clear logs",
+                    cancelButtonText: "Cancel",
+                    confirmButtonColor: "#b91c1c"
+                });
+
+                if (!sure.isConfirmed) {
+                    return;
+                }
+
+                await api("chat/callback-logs/clear", "POST", {});
+                Swal.fire("Cleared", "Callback logs have been cleared.", "success");
+            });
+        } catch (error) {
+            Swal.fire("Error", error.message, "error");
         }
     }
 
@@ -373,6 +698,18 @@
         }
     }
 
+    async function toggleChatbotProtection() {
+        const protectedMode = $("#chatbot-protected-toggle").is(":checked");
+
+        try {
+            await api("settings", "POST", { chatbot_protected: protectedMode });
+            Swal.fire("Saved", protectedMode ? "Chatbot callback protection enabled." : "Chatbot callback protection disabled.", "success");
+        } catch (error) {
+            $("#chatbot-protected-toggle").prop("checked", !protectedMode);
+            Swal.fire("Error", error.message, "error");
+        }
+    }
+
     $(document).ready(async function () {
         if (!$("#appointments-table-body").length) {
             return;
@@ -382,8 +719,12 @@
         $("#slot-form").on("submit", createSlot);
         $("#settings-form").on("submit", saveSettings);
         $(".bt-test-chat-webhook").on("click", testChatWebhook);
+        $(".bt-test-service-webhook").on("click", testServiceWebhook);
+        $(".bt-generate-api-key").on("click", generateCallbackAuth);
+        $(".bt-view-callback-logs").on("click", viewCallbackLogs);
         $("#chatbot-settings-form").on("submit", saveChatbotApiKey);
         $("#chatbot-toggle").on("change", toggleChatbot);
+        $("#chatbot-protected-toggle").on("change", toggleChatbotProtection);
         $("#refresh-dashboard").on("click", loadDashboard);
 
         $(document).on("click", ".edit-service", function () {

@@ -97,16 +97,32 @@ get_header();
                     <h2 class="h5 mb-3"><i class="fa-solid fa-link"></i> n8n Webhook</h2>
                     <form id="settings-form" class="row g-2">
                         <div class="col-12">
-                            <input type="url" id="webhook_url" class="form-control" placeholder="https://n8n.example.com/webhook/...">
+                            form submission webhook URL
+                            <input type="url" id="service_webhook_url" class="form-control" placeholder="https://n8n.example.com/webhook/...">
                         </div>
+                        <div class="col-12 d-grid border-bottom pb-3 mb-3">
+                            <button type="button" id="test-service-webhook" class="btn btn-outline-dark bt-test-service-webhook">Test Service Webhook</button>
+                        </div>
+
                         <div class="col-12">
+                            chat widget webhook URL
                             <input type="url" id="chat_webhook_url" class="form-control" placeholder="https://n8n.example.com/webhook/.../chat">
                         </div>
-                        <div class="col-12 d-grid">
-                            <button type="submit" class="btn btn-accent">Save Webhook URLs</button>
+                        <div class="form-check form-switch">
+                            Secure <input class="form-check-input" type="checkbox" role="switch" id="chatbot-protected-toggle" checked>
                         </div>
                         <div class="col-12 d-grid">
                             <button type="button" id="test-chat-webhook" class="btn btn-outline-dark bt-test-chat-webhook">Test Chat Webhook</button>
+                        </div>
+                        <div class="col-12 d-grid border-bottom pb-3 mb-3">
+                            <button type="button" id="generate-api-key" class="btn btn-outline-dark bt-generate-api-key">Generate API Key for callback</button>
+                        </div>
+                        <div class="col-12 d-grid border-bottom pb-3 mb-3">
+                            <button type="button" id="view-callback-logs" class="btn btn-outline-secondary bt-view-callback-logs">View Callback Logs</button>
+                        </div>
+
+                        <div class="col-12 d-grid">
+                            <button type="submit" class="btn btn-accent">Save Webhook URLs</button>
                         </div>
                     </form>
                     <p class="small text-muted mt-3 mb-0">Top URL handles appointments. Chat URL handles the public AI chat widget.</p>
@@ -165,7 +181,7 @@ get_header();
                                     <td>Chatbot</td>
                                     <td>
                                         Automated chat support for clients.
-                                        <form id="chatbot-settings-form" class="row g-2 mt-2">
+                                        <!-- <form id="chatbot-settings-form" class="row g-2 mt-2">
                                             <div class="col-sm-8 col-lg-7">
                                                 <input type="text" class="form-control form-control-sm" id="chatbot-api-key" placeholder="Enter OpenAI API Key" autocomplete="off">
                                             </div>
@@ -175,7 +191,7 @@ get_header();
                                             <div class="col-sm-12 col-lg-3 d-grid">
                                                 <button type="button" id="test-chat-webhook-inline" class="btn btn-sm btn-outline-secondary bt-test-chat-webhook">Test Chat Webhook</button>
                                             </div>
-                                        </form>
+                                        </form> -->
                                     </td>
                                     <td id="chatbot-status">Inactive</td>
                                     <td class="text-end">
@@ -191,15 +207,14 @@ get_header();
                                         <input type="text" placeholder="Enter Gmail API Key" class="form-control" id="email-api-key" >
                                         <button class="btn btn-sm btn-outline-dark">Save</button> -->
                                         Automated email support for clients.
-                                        <form class="row g-3">
+                                        <!-- <form class="row g-3">
                                             <div class="col-auto">
-                                                <!-- <label for="email-api-key" class="visually-hidden">Automated email support for clients.</label> -->
                                                 <input type="text" class="form-control-plaintext" id="email-api-key" placeholder="Enter Gmail API Key">
                                             </div>
                                             <div class="col-auto">
                                                 <button type="submit" class="btn btn-sm btn-outline-dark mb-3">Save</button>
                                             </div>
-                                        </form>
+                                        </form> -->
                                     </td>
                                     <td>Inactive</td>
                                     <td class="text-end">
